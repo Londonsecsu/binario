@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desafio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#050505;
+  color:#fff;
+  font-family:'Segoe UI',sans-serif;
+  overflow:hidden;
+}
+
+.screen{
+  position:absolute;
+  width:100%;height:100%;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:20px;
+  opacity:0;transition:.5s;
+  pointer-events:none;
+}
+.screen.active{opacity:1;pointer-events:auto}
+
+h1{font-size:26px;margin-bottom:10px}
+p{opacity:.8;margin-bottom:15px}
+
+button{
+  margin-top:15px;
+  padding:12px 22px;
+  border:none;
+  border-radius:25px;
+  background:#ff4d6d;
+  color:#fff;
+  font-size:15px;
+  cursor:pointer;
+}
+
+canvas{
+  background:#111;
+  border-radius:12px;
+}
+
+#score{margin-top:10px}
+
+/* POPUPS */
+.overlay{
+  position:absolute;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:10;
+}
+
+.box{
+  background:#0f0f0f;
+  padding:20px;
+  border-radius:15px;
+  width:90%;
+  max-width:340px;
+  box-shadow:0 0 30px rgba(0,0,0,.5);
+}
+
+input{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-top:10px;
+  background:#1a1a1a;
+  color:#fff;
+}
+
+#morseText{
+  font-size:11px;
+  background:#111;
+  padding:10px;
+  border-radius:10px;
+  margin-top:10px;
+  max-height:120px;
+  overflow:auto;
+  word-break:break-word;
+}
+
+.copyBtn{
+  background:#222;
+  margin-top:10px;
+}
+
+</style>
+</head>
+<body>
+
+<div id="popup" class="overlay">
+  <div class="box">
+    <p>Tá difícil? 😏</p>
+    <p>Quem é o amor da sua vida?</p>
+    <input id="popupInput">
+    <button onclick="checkSkip()">Responder</button>
+  </div>
+</div>
+
+<div id="morsePopup" class="overlay">
+  <div class="box">
+    <h1>Último Enigma</h1>
+    <p>Decifre:</p>
+    <div id="morseText"></div>
+    <button class="copyBtn" onclick="copyMorse()">Copiar código</button>
+    <button onclick="openAnswer()">Descobriu?</button>
+  </div>
+</div>
+
+<div id="answerPopup" class="overlay">
+  <div class="box">
+    <p>Cola a mensagem:</p>
+    <input id="finalAnswer">
+    <button onclick="checkFinal()">Confirmar</button>
+  </div>
+</div>
+
+<div class="screen active" id="intro">
+  <h1>Amor...</h1>
+  <p>tu achou que seria tão fácil assim? hahahahah</p>
+  <button onclick="goGame()">Continuar</button>
+</div>
+
+<div class="screen" id="game">
+  <canvas id="gameCanvas" width="300" height="500"></canvas>
+  <div id="score">0 / 10</div>
+</div>
+
+<script>
+let current='intro';
+function change(id){
+ document.getElementById(current).classList.remove('active');
+ setTimeout(()=>{
+  document.getElementById(id).classList.add('active');
+  current=id;
+  if(id==='game') startGame();
+ },300);
+}
+function goGame(){change('game')}
+
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+
+let birdY,velocity;
+let gravity=0.25,lift=-5.5;
+let pipes,score,deaths=0;
+
+function startGame(){
+ birdY=250;velocity=0;pipes=[];score=0;
+ document.getElementById('score').innerText='0 / 10';
+ spawnPipe();loop();
+}
+
+function spawnPipe(){
+ const gap=200;
+ const top=Math.random()*150+120;
+ pipes.push({x:300,top,bottom:top+gap,passed:false});
+}
+
+function gameOver(){
+ deaths++;
+ if(deaths>=3){
+  document.getElementById('popup').style.display='flex';
+  deaths=0;
+ }
+ startGame();
+}
+
+function loop(){
+ ctx.clearRect(0,0,300,500);
+ velocity+=gravity;birdY+=velocity;
+ ctx.beginPath();ctx.arc(80,birdY,10,0,Math.PI*2);ctx.fill();
+
+ for(let p of pipes){
+  p.x-=1;
+  ctx.fillRect(p.x,0,40,p.top);
+  ctx.fillRect(p.x,p.bottom,40,500);
+
+  if(84>p.x&&76<p.x+40){
+   if(birdY-4<p.top||birdY+4>p.bottom){gameOver();return}
+  }
+
+  if(!p.passed&&p.x+40<80){
+   p.passed=true;score++;
+   document.getElementById('score').innerText=score+' / 10';
+   if(score>=10){openMorse();return}
+  }
+ }
+
+ if(pipes[pipes.length-1].x<220)spawnPipe();
+ if(pipes[0].x<-50)pipes.shift();
+ if(birdY>500||birdY<0){gameOver();return}
+ requestAnimationFrame(loop);
+}
+
+window.addEventListener('click',()=>velocity=lift);
+
+function normalize(s){return s.toLowerCase().trim()}
+
+function checkSkip(){
+ const v=normalize(document.getElementById('popupInput').value);
+ if(v==='tu'||v==='lorenzo')openMorse();
+}
+
+// MORSE
+const text="Por meio desse enigma eu deixo a seguinte mensagem, Eu te amo e prometo estar contigo em todos os momentos, sejam eles dificeis ou bons, pois eu te amo! eu te amo mtooooo minha princesa.";
+
+const morseMap={a:'.-',b:'-...',c:'-.-.',d:'-..',e:'.',f:'..-.',g:'--.',h:'....',i:'..',j:'.---',k:'-.-',l:'.-..',m:'--',n:'-.',o:'---',p:'.--.',q:'--.-',r:'.-.',s:'...',t:'-',u:'..-',v:'...-',w:'.--',x:'-..-',y:'-.--',z:'--..',' ':' / ',',':'--..--','.':'.-.-.-','!':'-.-.--'};
+
+function toMorse(str){return str.toLowerCase().split('').map(c=>morseMap[c]||'').join(' ')}
+
+const morseText = toMorse(text);
+document.getElementById('morseText').innerText = morseText;
+
+function copyMorse(){
+ navigator.clipboard.writeText(morseText);
+ alert('Copiado!');
+}
+
+function openMorse(){document.getElementById('morsePopup').style.display='flex'}
+function openAnswer(){document.getElementById('answerPopup').style.display='flex'}
+
+function checkFinal(){
+ const val=normalize(document.getElementById('finalAnswer').value);
+ if(val.includes('eu te amo')){
+  window.location.href='https://a-gift-of-moments.lovable.app/';
+ }
+}
+</script>
+
+</body>
+</html>
